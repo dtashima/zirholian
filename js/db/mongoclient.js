@@ -91,7 +91,15 @@ MongoHeartsClient.prototype.create_hearts_game = function(obj) {
 
 }
 
+MongoHeartsClient.prototype.get_hearts_obj = function(heartsId, objType) {
+    
 /*    
+    def create_hearts_obj(self, obj, objType):
+        logging.debug(obj.json_dict())
+        result = self.db[objType].insert_one(obj.json_dict())
+        logging.debug('Obj created: {0}, {1}, {2}'.format(obj, objType, result.inserted_id))
+        return result.inserted_id
+
     def get_hearts_obj(self, heartsId, objType):
         logging.debug('Getting: {0}, id: {1}'.format(objType, heartsId))
         cursor = this.db[objType].find({'_id' : ObjectId(heartsId)})

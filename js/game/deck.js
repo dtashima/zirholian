@@ -1,6 +1,7 @@
 
 module.exports = {
-    Card: Card
+    Card: Card,
+    Deck: Deck
 };
 
 Card.SPADES = 'S';
@@ -24,7 +25,7 @@ Card._check = function(suit, rank){
         throw new Error('Rank ' + rank + ' unknown.');
     }
     if(Card.SUITS.indexOf(suit) < 0) {
-        throw new Error('Suit {0} unknown.'.format(suit));
+        throw new Error('Suit ' + suit + ' unknown.');
     }
 }
 
@@ -48,42 +49,40 @@ Card.get = function(suit, rank) {
 Card.prototype.toString = function () {
     return this.suit + this.rank;
 }
-/*
-    def __eq__(this, c):
-        return this.suit == c.suit and this.rank == c.rank
+// used for sorting cards within a hand (purely cosmetic, order
+// doesn't affect game play except within a suit)
+Card.prototype.valueOf = function() {
+    return (Card.SUITS.indexOf(this.suit) * 13) + Card.RANKS.indexOf(this.rank);
+}
 
-    def __lt__(this, c):
-        '''
-        used for sorting cards within a hand (purely cosmetic, order
-        doesn't affect game play except within a suit)
-        '''
-        if this.suit == c.suit:
-            return Card.RANKS.index(this.rank) <  Card.RANKS.index(c.rank)
-        else:
-            return Card.SUITS.index(this.suit) < Card.SUITS.index(c.suit)
+function Deck() {
+    this.cards = [];
+    for(var i = 0; i < Card.SUITS.length; i++) {
+        for(var j = 0; j < Card.RANKS.length; j++) {
+            var card = Card.get(Card.SUITS[i], Card.RANKS[j]);
+            this.cards.push(card);
+        }
+    }
     
-    def __gt__(this, other):
-        return other < this
+    this.cards = shuffle(this.cards);
+}
 
-class Deck(object):
-    def __init__(this):
-        this.cards = []
-        for suit in Card.SUITS:
-            for rank in Card.RANKS:
-                card = Card.get(suit, rank)
-                this.cards.append(card)
+Deck.prototype.toString = function () {
+    var out = "";
+    for(var i = 0; i < this.cards.length; i++) {
+        out += this.cards[i].toString();
+    }
+    return out;
+}
 
-        random.seed()
-        random.shuffle(this.cards)
+function shuffle(array) {
+    var m = array.length, t, i;
+    while(m) {
+        i = Math.floor(Math.random() * m--);
+        t = array[m];
+        array[m] = array[i];
+        array[i] = t;
+    }
+    return array;
+}
 
-    def __iter__(this):
-        while this.cards:
-            c = this.cards.pop()
-            yield c
-
-    def __str__(this):
-        out = ', '.join(str(c) for c in this.cards)
-        return out
-    
-        
-*/
