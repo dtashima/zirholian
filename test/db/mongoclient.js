@@ -13,7 +13,6 @@ describe('Mongo Hearts Get Test', function() {
     var client = null;
     
     beforeEach(function(done) {
-        handId = null;
         client = mongoclient.create_client(dbUrl='mongodb://localhost:27017/');
         client.create_user('abcd', 'abcd@qwerty.com', done);
         console.log('in before');

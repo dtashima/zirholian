@@ -83,7 +83,7 @@ MongoHeartsClient.prototype.close_connection = function() {
 MongoHeartsClient.prototype.create_hearts_game = function(obj) {
     console.log(obj);
     result = new HeartsGame(obj
-    }, function(err, obj) {
+    , function(err, obj) {
         if(err) return handleError(err);
     });
 
