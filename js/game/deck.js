@@ -1,7 +1,8 @@
 
 module.exports = {
     Card: Card,
-    Deck: Deck
+    Deck: Deck,
+    nice_sort: nice_sort
 };
 
 Card.SPADES = 'S';
@@ -84,5 +85,10 @@ function shuffle(array) {
         array[i] = t;
     }
     return array;
+}
+
+// Sorts by suit, then rank
+function nice_sort(card1, card2) {
+    return card1.valueOf() - card2.valueOf();
 }
 

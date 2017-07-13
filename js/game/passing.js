@@ -27,7 +27,7 @@ function PassingStrategy(name, methods) {
 }
 
 PassingStrategy.prototype.getMethod = function(handNumber) {
-    return this.methods[handNumber] % this.methods.length;
+    return this.methods[handNumber % this.methods.length];
 }
 
 PassingStrategy.prototype.toString = function() {
@@ -61,6 +61,7 @@ var PASSING_STRATEGY_DEFAULT_5_PLAYER = new PassingStrategy('PASSING_STRATEGY_DE
 
 module.exports = {
     PassingMethod : PassingMethod,
+    PASSING_STRATEGIES : PASSING_STRATEGIES,
     PASSING_METHOD_LEFT : PASSING_METHOD_LEFT,
     PASSING_METHOD_RIGHT : PASSING_METHOD_RIGHT,
     PASSING_METHOD_ACROSS : PASSING_METHOD_ACROSS,

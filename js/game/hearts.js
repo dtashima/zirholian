@@ -1,8 +1,9 @@
 var Passing = require('./passing.js');
+var heartsdeck = require('./deck.js');
 
 module.exports = {
     HeartsGame : HeartsGame,
-//    HeartsHand : HeartsHand;
+    HeartsHand : HeartsHand
 }
 
 
@@ -46,7 +47,7 @@ HeartsGame.prototype.initNew = function(players,
     this.bloodOnFirstTrick = bloodOnFirstTrick;
     this.maxPoints = maxPoints;
 
-    this.hands = [];
+    this.handIds = [];
     this.score = {};
     console.log("players: " + this.players);
     this.players.forEach(function(p) {
@@ -170,7 +171,94 @@ class HeartsGame(object):
 
         return res
 
+*/
 
+function HeartsHand(heartsGame, dealerIndex, passingMethod) {
+    this.gameId = heartsGame.id;
+    this.dealerIndex = dealerIndex;
+    this.passingMethod = passingMethod;
+    this.players = heartsGame.players;
+    this.numPlayers = this.players.length;
+    this.playerHands = new Object();
+    this.players.map(player => {
+        this.playerHands[player] = new Array();
+    });
+}
+
+// deal cards, initialize hands
+HeartsHand.prototype.initNew = function() {
+    deck = new heartsdeck.Deck();
+
+    for(let i = 0; i < deck.cards.length; i++) {
+        let card = deck.cards[i];
+        this.playerHands[this.players[i % this.numPlayers]].push(card);
+        this.players.map(player => {
+            this.playerHands[player].sort(deck.nice_sort);
+        });
+            
+//        this._startingHands = copy.deepcopy(this.playerHands);
+        this.handState = HeartsHand.HAND_STATE_STARTED;
+    }
+}
+
+
+HeartsHand.HAND_STATE_STARTED =  'HAND_STATE_STARTED';
+HeartsHand.HAND_STATE_PASSED =   'HAND_STATE_PASSED';
+HeartsHand.HAND_STATE_FINISHED = 'HAND_STATE_FINISHED';
+
+/*
+  playerFrom - username of player doing the pass
+  passes - has of username:list of cards to pass
+*/
+HeartsHand.prototype.addPlayerPasses = function(playerFrom, passes) {
+    if(this.handState != HeartsHand.HAND_STATE_STARTED) {
+        throw new Error('Attempted pass when hand in state: ' +
+                        this.handState);
+    }
+    var playerFromIndex = this.players.indexOf(playerFrom);
+    console.log('passing method: ' + this.passingMethod.offsets);
+    var legalPassTargets = this.passingMethod.offsets.map(i => {
+        return (i + playerFromIndex) % this.numPlayers;
+    })
+        .map(x => {
+            return this.players[x];
+        });
+
+    console.log('playerFrom: ' + playerFrom + ', legalPassTargets: ' +
+                legalPassTargets);
+
+    passes.keys.forEach(k => {
+        let passee = k;
+        let passCards = passes[k];
+        passCards.forEach(c => {
+            if(legalPassTargets.length == 0) {
+                throw new Error('Too many passes.');
+            }
+            let n = legalPassTargets.indexOf(k);
+            if(n < 0) {
+                throw new Error('pass target not found: ' + k);
+            }
+            legalPassTargets.splice(n, 1);
+        });
+    });
+
+    if(legalPassTargets.length > 0) {
+        throw new Error('Not enough passes.');
+    }
+/*    
+        self.passes[playerFrom] = passes
+
+        # check of all players have passed
+        for p in self.players:
+            if p not in self.passes:
+                return
+
+        self._executePass()
+
+        self.tricks.append(collections.OrderedDict())
+*/
+}
+/*
 class HeartsHand(object):
     HAND_STATE_STARTED =    'HAND_STATE_STARTED'
     HAND_STATE_PASSED =     'HAND_STATE_PASSED'

@@ -1,18 +1,24 @@
 const pg = require('pg');
 const async = require('async');
 const hearts = require('../game/hearts.js');
+const passing = require('../game/passing.js');
 
 module.exports = {
     create_client: create_client
 }
 
-
-
 function create_client(dbUrl, dbPort, dbName, user, password) {
     return new PgHeartsClient(dbUrl, dbPort, dbName, user, password);
 }
 
+function handleError(err) {
+    console.log('Error: ' + err);
+    throw err;
+}
 
+/*
+  Postgres DAO client
+*/
 function PgHeartsClient(dbUrl, dbPort, dbName, user, password) {
     console.log('PgHeartsClient constructor');
     this.config = {
@@ -27,9 +33,29 @@ function PgHeartsClient(dbUrl, dbPort, dbName, user, password) {
     this.pool = new pg.Pool(this.config);
 }
 
-function handleError(err) {
-    console.log('Error: ' + err);
-    throw err;
+PgHeartsClient.prototype.close = function() {
+    this.pool.end();
+}
+
+/*
+  Generic database action; handles pool connection (if necessary)
+  and callback.
+*/
+PgHeartsClient.prototype.database_action = async function(pgClient, callback) {
+    var client = typeof pgClient == 'undefined' ? null : pgClient;
+    try {
+        if(client == null) {
+            client = await this.pool.connect();
+        }
+        return await callback(client);
+    } catch(err) {
+        console.error('error in database_action: ' + err.stack);
+        throw err;
+    } finally {
+        if(client != null && typeof pgClient == 'undefined') {
+            client.release();
+        }
+    }
 }
 
 PgHeartsClient.prototype.create_user = async function(username, email) {
@@ -65,134 +91,6 @@ PgHeartsClient.prototype.create_user = async function(username, email) {
 
 }
 
-
-    /*
-        return new Promise((resolve, reject) =>
-                       _create_user(username, email, (err, result) =>
-                                             err ? reject(err) : resolve(result)
-                                            )
-                      );
-}
-*/
-    
-
-/*
-PgHeartsClient.prototype.create_user = function(username, email, cb) {
-    const _this = this;
-    console.log('draining: ' + this.pool.pool._draining);
-    
-    async function _create_user(username, email) {
-        console.log('in create_user: ' + username);
-        var pool = _this.pool
-        var client = null;
-        console.log('draining: ' + pool.pool._draining);
-        // check to see if username exists]
-        try {
-            client = await pool.connect();
-            user = await _this.get_user_by_username(username, client);
-        } catch (e) {
-            console.log('failed get user ' + e.stack);
-            throw e;
-        }
-
-        console.log('draining: ' + pool.pool._draining);
-        console.log('user: ' + JSON.stringify(user));
-        if(user != null && user != '') {
-            //                    cb(new Error("Username " + username + " exists."), null);
-            throw new Error("Username " + username + " exists.");
-        } else {
-            console.log('pre query: ' + pool);
-            try {
-                var res = await client.query('INSERT INTO hearts_users (username, email) VALUES ($1, $2)', [username, email]);
-                console.log('post query: ' + res);
-            } catch (e) {
-                console.log('Error creating: ' + e.stack);
-                throw e;
-            } finally {
-                if(client != null) {
-                    client.release();
-                }
-            }
-        }
-
-    }
-
-    if(cb) {
-        console.log('asdf');
-        return _create_user(username, email)()
-            .then(result => {
-                console.log('then');
-                cb(null, result)
-            })
-            .catch(err => {
-                console.log('catch');
-                cb(err, null)
-            });
-    }
-
-    return _create_user;
-    
-}
-/*
-*/
-
-
-/*
-PgHeartsClient.prototype.get_user_by_username = function(username, callback) {
-    console.log('in get_user_by_username: ' + username);
-    var pool = this.pool;
-
-    try {
-        pool.query('SELECT username, email from hearts_users where username=$1', [username],
-                   (err, res) => {
-                       var rows = res.rows;
-                       console.log('a: ' + rows.length);
-                       if(rows != null && rows.length > 0) {
-//                console.log('adf' + rows[0]);
-                           callback(null, rows[0]);
-                       } else {
-//                console.log('null');
-                           callback(null, null);
-                       }
-                   }
-                  );
-            
-    } catch(err) {
-        console.error('error in get_user_by_username: ' + err.stack);
-        callback(err, null);
-    }
-}
-*/
-/*
-PgHeartsClient.prototype.get_user_by_username = async function(username, pgClient) {
-    console.log('in get_user_by_username: ' + username);
-    var client = typeof pgClient == 'undefined' ? null : pgClient;
-    try {
-        if(client == null) {
-            client = await this.pool.connect();
-        }
-
-        var { rows } = await client.query('SELECT username, email from hearts_users where username=$1', [username]);
-                
-//        console.log('a: ' + rows.length);
-        if(rows != null && rows.length > 0) {
-            //                console.log('adf' + rows[0]);
-            return rows[0];
-        } else {
-            //                console.log('null');
-            return null;
-        }
-    } catch(err) {
-        console.error('error in get_user_by_username: ' + err.stack);
-        throw err;
-    } finally {
-        if(client != null && typeof pgClient == 'undefined') {
-            client.release();
-        }
-    }
-
-}
-*/
 PgHeartsClient.prototype.get_user_by_username = async function(username, pgClient) {
     console.log('in get_user_by_username: ' + username);
     async function cb(client) {
@@ -209,52 +107,6 @@ PgHeartsClient.prototype.get_user_by_username = async function(username, pgClien
 }
 
 
-
-/*
-PgHeartsClient.prototype.get_user_by_username = function(username, cb) {
-    const _this = this;
-    function _get_user_by_username (username, cb) {
-        console.log('in get_user_by_username: ' + username);
-        (async () => {
-            const client = await _this.pool.connect();
-            console.log('pre query pool' + _this.pool.pool._draining);
-
-            try {
-                var { rows } = await client.query('SELECT username, email from hearts_users where username=$1', [username]);
-                
-                console.log('a: ' + rows.length);
-                if(rows != null && rows.length > 0) {
-                    //                console.log('adf' + rows[0]);
-                    return cb(null, rows[0]);
-                } else {
-                    //                console.log('null');
-                    return cb(null, null);
-                }
-            } catch(err) {
-                console.error('error in get_user_by_username: ' + err.stack);
-                return cb(err, null);
-            } finally {
-                client.release();
-            }
-        })().catch(e => {
-            console.error(e.stack);
-            return cb(e, null);
-        }
-                  );
-    }
-
-    if(cb) {
-        return _get_user_by_username(username, cb);
-    }
-
-    return new Promise((resolve, reject) =>
-                       _get_user_by_username(username, (err, result) =>
-                                             err ? reject(err) : resolve(result)
-                                            )
-                      );
-
-}
-/**/
 /*
 PgHeartsClient.prototype.delete_user = async function(username, pgClient) {
     var client = typeof pgClient == 'undefined' ? null : pgClient;
@@ -274,6 +126,7 @@ PgHeartsClient.prototype.delete_user = async function(username, pgClient) {
     }
 }
 */
+
 PgHeartsClient.prototype.delete_user = async function(username, pgClient) {
     async function cb(client) {
         return await client.query('DELETE FROM hearts_users where username=$1', [username]);
@@ -283,10 +136,6 @@ PgHeartsClient.prototype.delete_user = async function(username, pgClient) {
     return await this.database_action(pgClient, cb);
 }
 
-
-PgHeartsClient.prototype.close = function() {
-    this.pool.end();
-}
 
 // Given a game object, persist and return idresult
 PgHeartsClient.prototype.create_hearts_game = async function(game) {
@@ -318,8 +167,11 @@ PgHeartsClient.prototype.create_hearts_game = async function(game) {
             var query = 'INSERT INTO hearts_game (' +
                 'jack_of_diamonds, ' +
                 'blood_on_first_trick, ' +
-                'max_points, game_state ' + 
-                ') VALUES ($1, $2, $3, $4) ' +
+                'max_points, ' +
+                'game_state, ' +
+                'passing_strategy, ' +
+                'first_player ' +
+                ') VALUES ($1, $2, $3, $4, $5, $6) ' +
                 ' RETURNING id;';
             console.log('QUERY: ' + query);
             console.log('game: ' + JSON.stringify(game));
@@ -327,11 +179,43 @@ PgHeartsClient.prototype.create_hearts_game = async function(game) {
                 game.jackOfDiamonds,
                 game.bloodOnFirstTrick,
                 game.maxPoints,
-                game.gameState
+                game.gameState,
+                game.passingStrategy.name,
+                game.firstPlayer
             ]);
-            console.log('rows: ' + rows[0]['id']);
+
+            var id = rows[0]['id'];
+            console.log('gameId: ' + id);
+
+            query = 'INSERT INTO hearts_game_players (' +
+                'game_id, ' +
+                'player, ' +
+                'index ' +
+                ') VALUES ($1, $2, $3) ';
+            console.log('QUERY: ' + query);
+            var qs = game.players.map(x => client.query(query, [
+                id,
+                x,
+                game.players.indexOf(x)]));
+
+            await Promise.all(qs);
+
+            // save scores
+            query = 'INSERT INTO hearts_game_scores (' +
+                'game_id, ' +
+                'player, ' +
+                'score ' +
+                ') VALUES ($1, $2, $3) ';
+            console.log('QUERY: ' + query);
+            var scores_qs = game.players.map(x => client.query(query, [
+                id,
+                x,
+                game.score[x]]));
+
+            await Promise.all(qs);
+            
             await client.query('COMMIT');
-            return rows[0]['id'];
+            return id;
         } catch(e) {
             await client.query('ROLLBACK');
             throw e;
@@ -344,29 +228,78 @@ PgHeartsClient.prototype.create_hearts_game = async function(game) {
 
 }
 
-PgHeartsClient.prototype.get_hearts_game = async function(gameId) {
-}
+PgHeartsClient.prototype.get_hearts_game = async function(gameId, pgClient) {
+    async function cb(client) {
+        var game = new hearts.HeartsGame();
+        
+        var { rows } = await client.query('SELECT ' +
+                                          'jack_of_diamonds, ' +
+                                          'blood_on_first_trick, ' +
+                                          'max_points, ' +
+                                          'game_state, ' +
+                                          'passing_strategy, ' +
+                                          'first_player ' +
+                                          'FROM hearts_game where id=$1', [gameId]);
+        var row = rows[0];
+        game.jackOfDiamonds = row.jack_of_diamonds;
+        game.bloodOnFirstTrick = row.blood_on_first_trick;
+        game.maxPoints = row.max_points;
+        game.gameState = row.game_state;
+        game.firstPlayer = row.first_player;
+        game.passingStrategy = passing.PASSING_STRATEGIES[row.passing_strategy];
 
-PgHeartsClient.prototype.database_action = async function(pgClient, callback) {
-    var client = typeof pgClient == 'undefined' ? null : pgClient;
-    try {
-        if(client == null) {
-            client = await this.pool.connect();
-        }
-        return await callback(client);
-    } catch(err) {
-        console.error('error in database_action: ' + err.stack);
-        throw err;
-    } finally {
-        if(client != null && typeof pgClient == 'undefined') {
-            client.release();
-        }
+        var res = await client.query('SELECT ' +
+                                     'player, ' +
+                                     'index ' +
+                                     'FROM hearts_game_players WHERE game_id=$1',
+                                     [gameId]);
+
+        var player_rows = res['rows'];
+        game.players = player_rows.map(row => {
+            return [row.index, row.player];
+        })
+            .sort((a,b) => {
+                return a[0]-b[0];
+            });
+        game.players = game.players
+            .map(pair => {
+                return pair[1];
+            });
+
+        // load scores
+        var score_res = await client.query('SELECT ' +
+                                           'player, ' +
+                                           'score ' +
+                                           'FROM hearts_game_scores WHERE game_id=$1',
+                                           [gameId]);
+
+        var score_rows = score_res['rows'];
+
+        game.score = new Object();
+        score_rows.map(row => {
+            game.score[row.player] = row.score;
+            return;
+        });
+        
+        return game;
     }
+
+    return await this.database_action(pgClient, cb);
 }
 
 PgHeartsClient.prototype.delete_hearts_game = async function(gameId, pgClient) {
     async function cb(client) {
-        return await client.query('DELETE FROM hearts_game where id=$1', [gameId]);
+        try {
+            await client.query('BEGIN');
+            await client.query('DELETE FROM hearts_game_players where game_id=$1', [gameId]);
+            await client.query('DELETE FROM hearts_game_scores where game_id=$1', [gameId]);
+            await client.query('DELETE FROM hearts_game where id=$1', [gameId]);
+            await client.query('COMMIT');
+            return;
+        } catch(e) {
+            await client.query('ROLLBACK');
+            throw e;
+        }
         return;
     }
 
