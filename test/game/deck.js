@@ -62,6 +62,25 @@ describe('Basic deck test', function() {
         });
     });
 
+    describe('#valueOf', function() {
+        it('should sort cards correctly', function(done) {
+            var c1 = Card.get(Card.HEARTS, '5');
+            var c2 = Card.get(Card.HEARTS, '6');
+            var c3 = Card.get(Card.SPADES, '6');
+            var c4 = Card.get(Card.SPADES, 'A');
+            var cards = [c1, c2, c3, c4];
+            console.log('unsorted: ' + JSON.stringify(cards));
+            cards.sort(deck.nice_sort);
+            console.log('sorted: ' + JSON.stringify(cards));
+            assert(cards[0] == c3);
+            assert(cards[1] == c4);
+            assert(cards[2] == c1);
+            assert(cards[3] == c2);
+
+            done();
+        });
+    });
+
     describe('#deck basics', function() {
         it('should create a randomized deck.', function(done) {
             var d1 = new Deck();

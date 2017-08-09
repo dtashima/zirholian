@@ -79,6 +79,7 @@ describe('Postgres User Get Test', function() {
 describe('Postgres Game DB Test', function() {
     var client = null;
     var heartsGameId = null;
+    var game = null;
     
     beforeEach(function(done) {
         console.log('in before');
@@ -100,11 +101,11 @@ describe('Postgres Game DB Test', function() {
         console.log('teardown');
         if(client != null) {
             (async () => {
+                if(heartsGameId != null) {
+                    await client.delete_hearts_game(heartsGameId);
+                }
                 deletefuns = ['testuser1', 'testuser2', 'testuser3', 'testuser4'].map(x => client.delete_user(x));
                 
-                if(heartsGameId != null) {
-                    deletefuns.push(client.delete_hearts_game(heartsGameId));
-                }
 
                 await Promise.all(deletefuns);
             })().then(res => { done(); })
@@ -114,15 +115,9 @@ describe('Postgres Game DB Test', function() {
     });
 
     describe('#hearts game()', function() {
-/*
-        it('does nothng', function(done) {
-            done();
-        });
-*/
-
         it('should create a heart game with defaults', function(done) {
             console.log('starting test');
-            var game = new hearts.HeartsGame();
+            game = new hearts.HeartsGame();
             game.initNew(['testuser1', 'testuser2', 'testuser3', 'testuser4']);
             assert(game.players[0] == 'testuser1');
             assert(game.jackOfDiamonds == false);
@@ -162,6 +157,57 @@ describe('Postgres Game DB Test', function() {
                     done();
                 });
         });
+
+        it('should create a heart game with non-default values, save it, and then retrieve it', function(done) {
+            game = new hearts.HeartsGame();
+            game.initNew(['testuser1', 'testuser2', 'testuser3', 'testuser4'],
+                         passing.PASSING_STRATEGY_HOLD,
+                         true,
+                         false,
+                         150);
+            game.score['testuser1'] = 1;
+            game.score['testuser2'] = 2;
+            game.score['testuser3'] = 3;
+            game.score['testuser4'] = 4;
+            
+            assert(game.players[1] == 'testuser2');
+            assert(game.jackOfDiamonds == true);
+            assert(game.bloodOnFirstTrick == false);
+            assert(game.maxPoints == 150);
+            assert(game.passingStrategy == passing.PASSING_STRATEGY_HOLD);
+            assert(game.gameState == hearts.HeartsGame.GAME_STATE_PLAYING);
+
+            (async() => {
+                try {
+                    var gameId = await client.create_hearts_game(game);
+                    console.log('in create_hearts_game, ' + 'gameId: ' + gameId);
+                    heartsGameId = gameId;
+                    assert(gameId != null);
+
+                    var game2 = await client.get_hearts_game(gameId);
+                    console.log('game retrieved: ' + JSON.stringify(game2));
+                    assert(game2.players[1] == 'testuser2');
+                    assert(game2.jackOfDiamonds == true);
+                    assert(game2.bloodOnFirstTrick == false);
+                    assert(game2.maxPoints == 150);
+                    assert(game2.passingStrategy == passing.PASSING_STRATEGY_HOLD);
+                    assert(game2.gameState == hearts.HeartsGame.GAME_STATE_PLAYING);
+                    assert(game2.firstPlayer == game.firstPlayer);
+                    assert(game2.score['testuser1'] == 1);
+                    assert(game2.score['testuser2'] == 2);
+                    assert(game2.score['testuser3'] == 3);
+                    assert(game2.score['testuser4'] == 4);
+
+                    return gameId;
+                } catch (e) {
+                    throw e;
+                }
+            })().then(res => {
+                done();
+            })
+                .catch(e => done(e));
+        });
+
 
         
     });
