@@ -49,22 +49,26 @@ Card.get = function(suit, rank) {
 */
 Card.prototype.toString = function () {
     return this.suit + this.rank;
-}
+};
+
 // used for sorting cards within a hand (purely cosmetic, order
 // doesn't affect game play except within a suit)
 Card.prototype.valueOf = function() {
     return (Card.SUITS.indexOf(this.suit) * 13) + Card.RANKS.indexOf(this.rank);
-}
+};
+
+Card.prototype.isBlood = function() {
+    return (this.suit == Card.HEARTS || (this.suit == Card.SPADES && this.rank == 'Q'));
+};
+
+Card.prototype.rankIndex = function() {
+    return Card.RANKS.indexOf(this.rank);
+};
+
 
 function Deck() {
     this.cards = [];
-    for(var i = 0; i < Card.SUITS.length; i++) {
-        for(var j = 0; j < Card.RANKS.length; j++) {
-            var card = Card.get(Card.SUITS[i], Card.RANKS[j]);
-            this.cards.push(card);
-        }
-    }
-    
+    this.addCards();
     this.cards = shuffle(this.cards);
 }
 
@@ -74,7 +78,16 @@ Deck.prototype.toString = function () {
         out += this.cards[i].toString();
     }
     return out;
-}
+};
+
+Deck.prototype.addCards = function() {
+    for(var i = 0; i < Card.SUITS.length; i++) {
+        for(var j = 0; j < Card.RANKS.length; j++) {
+            var card = Card.get(Card.SUITS[i], Card.RANKS[j]);
+            this.cards.push(card);
+        }
+    }
+};
 
 function shuffle(array) {
     var m = array.length, t, i;

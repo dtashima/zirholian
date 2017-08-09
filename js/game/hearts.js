@@ -1,10 +1,12 @@
-var Passing = require('./passing.js');
-var heartsdeck = require('./deck.js');
+const Passing = require('./passing.js');
+const heartsdeck = require('./deck.js');
+const Card = heartsdeck.Card;
 
 module.exports = {
     HeartsGame : HeartsGame,
-    HeartsHand : HeartsHand
-}
+    HeartsHand : HeartsHand,
+    Action :     Action
+};
 
 
 function HeartsGame() {
@@ -26,7 +28,7 @@ HeartsGame.prototype.initNew = function(players,
     
     this.players = players;
 
-    var defaultPassingStrategy = null;
+    let defaultPassingStrategy = null;
     if(this.players.length == 3) {
         defaultPassingStrategy = Passing.PASSING_STRATEGY_DEFAULT_3_PLAYER;
     } else if (this.players.length == 5) {
@@ -55,7 +57,7 @@ HeartsGame.prototype.initNew = function(players,
     }, this);
     console.log("score: " + JSON.stringify(this.score));
 
-    var numScores = Object.keys(this.score).length;
+    const numScores = Object.keys(this.score).length;
     if (numScores != this.players.length)
         throw "Duplicate player names found. Number of scores: " + numScores + "; Number of players: " + this.players.length;
 
@@ -69,11 +71,15 @@ HeartsGame.prototype._nextPlayer = function(player) {
         throw "Player not found: " + player;
     }
     
-    var n = this.players.indexOf(player);
+    let n = this.players.indexOf(player);
     n += 1;
     n = n % this.players.length;
     return this.players[n];
 };
+
+// wrapper for HeartsHand.playCard
+//HeartsGame.prototype.playCard = function(action) {
+    
 
 /*
 
@@ -175,6 +181,7 @@ class HeartsGame(object):
 
 function HeartsHand(heartsGame, dealerIndex, passingMethod) {
     this.gameId = heartsGame.id;
+    this.bloodOnFirstTrick = heartsGame.bloodOnFirstTrick;
     this.dealerIndex = dealerIndex;
     this.passingMethod = passingMethod;
     this.players = heartsGame.players;
@@ -183,28 +190,43 @@ function HeartsHand(heartsGame, dealerIndex, passingMethod) {
     this.players.map(player => {
         this.playerHands[player] = new Array();
     });
+    this.passes = new Object();
+    this.tricks = new Array(); // Array of objects (player -> card)
+    this.tricks.push(new HeartsTrick()); // initialize with first empty trick
+
+    this.tricksTaken = new Object(); // (player -> array of tricks)
+    this.players.forEach(player => this.tricksTaken[player] = new Array());
+    this.nextToAct = this.dealerIndex;
 }
 
 // deal cards, initialize hands
-HeartsHand.prototype.initNew = function() {
-    deck = new heartsdeck.Deck();
+HeartsHand.prototype.initNew = function(deck) {
+    if(typeof deck == 'undefined') {
+        deck = new heartsdeck.Deck();
+    }
 
     for(let i = 0; i < deck.cards.length; i++) {
         let card = deck.cards[i];
         this.playerHands[this.players[i % this.numPlayers]].push(card);
-        this.players.map(player => {
-            this.playerHands[player].sort(deck.nice_sort);
-        });
+    }
+        
+    this.players.forEach(player => {
+        this.playerHands[player].sort(heartsdeck.nice_sort);
+    });
             
 //        this._startingHands = copy.deepcopy(this.playerHands);
-        this.handState = HeartsHand.HAND_STATE_STARTED;
-    }
-}
+    this.handState = HeartsHand.HAND_STATE_STARTED;
+};
 
 
 HeartsHand.HAND_STATE_STARTED =  'HAND_STATE_STARTED';
 HeartsHand.HAND_STATE_PASSED =   'HAND_STATE_PASSED';
 HeartsHand.HAND_STATE_FINISHED = 'HAND_STATE_FINISHED';
+
+// returns current trick
+HeartsHand.prototype.currentTrick = function() {
+    return this.tricks.slice(-1)[0];
+};
 
 /*
   playerFrom - username of player doing the pass
@@ -225,9 +247,11 @@ HeartsHand.prototype.addPlayerPasses = function(playerFrom, passes) {
         });
 
     console.log('playerFrom: ' + playerFrom + ', legalPassTargets: ' +
-                legalPassTargets);
+                legalPassTargets + ', passes: ' +
+                JSON.stringify(passes));
 
-    passes.keys.forEach(k => {
+    // do checks
+    Object.keys(passes).forEach(k => {
         let passee = k;
         let passCards = passes[k];
         passCards.forEach(c => {
@@ -245,19 +269,212 @@ HeartsHand.prototype.addPlayerPasses = function(playerFrom, passes) {
     if(legalPassTargets.length > 0) {
         throw new Error('Not enough passes.');
     }
-/*    
-        self.passes[playerFrom] = passes
 
-        # check of all players have passed
-        for p in self.players:
-            if p not in self.passes:
-                return
+    // set this pass
+    this.passes[playerFrom] = passes;
 
-        self._executePass()
+    // check if all players have passed
+    if(!this.players.every(x => {
+        return this.passes.hasOwnProperty(x);
+    })) {
+        return;
+    }
 
-        self.tricks.append(collections.OrderedDict())
+    this._executePass();
+    
+};
+
+HeartsHand.prototype._executePass = function() {
+    console.log('All players have passed, executing');
+    Object.keys(this.passes).forEach(playerFrom => {
+        let playerPass = this.passes[playerFrom];
+        console.log('playerFrom: ' + playerFrom + ' playerPass: ' + JSON.stringify(playerPass));
+        Object.keys(playerPass).forEach(playerTo => {
+            let cards = playerPass[playerTo];
+            cards.forEach(card => {
+                let n = this.playerHands[playerFrom].indexOf(card);
+                /*
+                console.log('asdfadsf: ' +
+                            this.playerHands[playerFrom] + ' to: ' +
+                            this.playerHands[playerTo] + ' card: ' +
+                            JSON.stringify(card) + ' n: ' + n);
 */
+                this.playerHands[playerFrom].splice(n, 1);
+                this.playerHands[playerTo].push(card);
+                /*
+                console.log('asdfadsf: ' +
+                            this.playerHands[playerFrom] + ' to: ' +
+                            this.playerHands[playerTo] + ' card: ' +
+                            JSON.stringify(card) + ' n: ' + n);
+*/
+            });
+        });
+    });
+
+    Object.keys(this.playerHands).forEach(player => {
+        const hand = this.playerHands[player];
+        hand.sort(heartsdeck.nice_sort);
+//        console.log(JSON.stringify(this.playerHands[player]));
+        if(hand.length != 52/this.players.length) {
+            throw new Error('Error after pass, hand does not have the right number of cards.');
+        }
+
+        this.handState = HeartsHand.HAND_STATE_PASSED;
+        const c2 = Card.get(Card.CLUBS, '2');
+        for(let i = 0; i < this.players.length; i++) {
+            if(this.playerHands[this.players[i]][0] == c2) {
+                this.nextToAct = i;
+                break;
+            }
+        }
+    });
+};
+
+HeartsHand.ERROR_NOT_YOUR_TURN = 'ERROR_NOT_YOUR_TURN';
+HeartsHand.ERROR_NO_BLOOD_ON_FIRST_TRICK = 'ERROR_NO_BLOOD_ON_FIRST_TRICK';
+HeartsHand.ERROR_MUST_FOLLOW_SUIT = 'ERROR_MUST_FOLLOW_SUIT';
+HeartsHand.ERROR_MUST_HAVE_CARD = 'ERROR_MUST_HAVE_CARD';
+
+// returns a tuple of boolean (is valid), and an error string
+HeartsHand.prototype.isValidPlay = function(action) {
+    const trick = this.currentTrick();
+    const player = action.player;
+    const playerHand = this.playerHands[player];
+    console.log('isValidPlay: ' + JSON.stringify(action));
+    console.log(`next to act: ${this.nextToAct}; player: ${this.players.indexOf(player)}`);
+
+    // confirm player has card
+    const hasCard = playerHand.find(x => { return x.valueOf() == action.card.valueOf(); } );
+    if(typeof hasCard == 'undefined') {
+        return [false, HeartsHand.ERROR_MUST_HAVE_CARD];
+    }
+    
+    // check to see if it's your turn
+    if(this.nextToAct != this.players.indexOf(player)) {
+        return [false, HeartsHand.ERROR_NOT_YOUR_TURN];
+    }
+       
+    // check for blood on first trick
+    if(this.tricks.length == 1 && !this.bloodOnFirstTrick
+       && action.card.isBlood()) {
+        return [false, HeartsHand.ERROR_NO_BLOOD_ON_FIRST_TRICK];
+    }
+
+    // check to see if suit is followed
+    if(Object.keys(trick.cards).length > 0) {
+        const suitLed = trick.suitLed;
+        if(action.card.suit != suitLed) {
+            if(typeof playerHand.find(x => { return x.suit == suitLed; }) != 'undefined') {
+                return [false, HeartsHand.ERROR_MUST_FOLLOW_SUIT];
+            }
+        }
+    }
+    
+    return [true, null];
+    
+};
+
+HeartsHand.prototype.playCard = function(action) {
+    const trick = this.currentTrick();
+    const player = action.player;
+
+    console.log(`next to act: ${this.nextToAct}; player: ${this.players.indexOf(player)}`);
+    const valid = this.isValidPlay(action);
+    if(!valid[0]) {
+        throw new Error('Not valid action: ' + valid[1]);
+    }
+
+    trick.playCard(action);
+    this.playerHands[player].splice(this.playerHands[player].indexOf(action.card), 1);
+
+    // determine who takes the trick
+    if(Object.keys(trick.cards).length == this.players.length) {
+        var taker = null;
+        var highest = null;
+        Object.keys(trick.cards).forEach(player => {
+            const card = trick.cards[player];
+            if(card.suit == trick.suitLed && (highest == null || highest.rankIndex() < card.rankIndex())) {
+                taker = player;
+                highest = card;
+            }
+        });
+        console.log('playcard: ' + taker + ' ' + highest + ' ' + this.players.indexOf(taker));
+        this.nextToAct = this.players.indexOf(taker);
+        this.tricks.push(new HeartsTrick());
+        this.tricksTaken[taker].push(trick);
+
+        if(this.playerHands[taker].length == 0) {
+            return this.endHand();
+        }
+        return;
+    }
+    
+    this.nextToAct = (this.nextToAct + 1) % this.players.length;
+};
+
+HeartsHand.prototype.endHand = function() {
+    // count points
+    var points = new Object();
+    Object.keys(this.tricksTaken).forEach(player => {
+        const tricks = this.tricksTaken[player];
+        var n = 0;
+        tricks.forEach(trick => {
+            Object.values(trick.cards).forEach(c => {
+                if(c.suit == Card.HEARTS) {
+                    n += 1;
+                } else if(c.suit == Card.SPADES && c.rank == 'Q') {
+                    n += 13;
+                }
+            });
+        });
+
+        points[player] = n;
+    });
+
+    console.log('Hand over: ' + JSON.stringify(points));
+
+    // check for shooting
+    const shooter = Object.keys(points).find(player => {
+        const p = points[player];
+        return p == 26;
+    });
+
+    if(typeof shooter != 'undefined') {
+        points = new Object();
+        points[shooter] = 0;
+        this.players.forEach(p => {
+            if(p != shooter) {
+                points[p] = 26;
+            }
+        });
+    }
+    return points;
+};
+
+function Action(player, card) {
+    this.player = player;
+    this.card = card;
 }
+
+Action.prototype.json_dict = function() {
+    return {
+        'player' : this.player,
+        'card' :   this.card.toString()
+    };
+};
+
+function HeartsTrick() {
+    this.cards = new Object();
+    this.suitLed = null;
+}
+
+HeartsTrick.prototype.playCard = function(action) {
+    this.cards[action.player] = action.card;
+    if(Object.keys(this.cards).length == 1) {
+        this.suitLed = action.card.suit;
+    }
+}
+
 /*
 class HeartsHand(object):
     HAND_STATE_STARTED =    'HAND_STATE_STARTED'
